@@ -372,3 +372,22 @@ Blockly.Blocks['control_delete_this_clone'] = {
     });
   }
 };
+
+Blockly.Blocks['define_block'] = {
+  /**
+   * Block for "delete this clone."
+   * @this Blockly.Block
+   */
+  init: function() {
+    this.jsonInit({
+      "message0": "define %1",
+      "args0": [
+        {
+          "type": "input_statement",
+          "name": "custom_block"
+        }
+      ],
+      "extensions": ["colours_control", "shape_hat"]
+    });
+  }
+};

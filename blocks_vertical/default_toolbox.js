@@ -326,6 +326,7 @@ Blockly.Blocks.defaultToolbox = '<xml id="toolbox-categories" style="display: no
     '</block>'+
   '</category>'+
   '<category name="Control" colour="#FFAB19" secondaryColour="#CF8B17">'+
+    '<block type="controls_repeat" id="controls_repeat_block"></block>' +
     '<block type="define_block" id="define_block"></block>' +
     '<block type="control_wait" id="control_wait">'+
       '<value name="DURATION">'+

@@ -686,6 +686,8 @@ Blockly.BlockSvg.prototype.renderCompute_ = function(iconWidth) {
   inputRows.hasDummy = false;
   var lastType = undefined;
 
+  var maxRowWidth = 0;
+
   // Previously created row, for special-casing row heights on C- and E- shaped blocks.
   var previousRow;
   for (var i = 0, input; input = this.inputList[i]; i++) {
@@ -707,6 +709,7 @@ Blockly.BlockSvg.prototype.renderCompute_ = function(iconWidth) {
     // Compute minimum dimensions for this input.  These may later be revised.
     input.renderHeight = this.computeInputHeight_(input, row, previousRow);
     input.renderWidth = Blockly.BlockSvg.computeInputWidth_(input);
+    maxRowWidth = Math.max(maxRowWidth, input.renderWidth);
 
     // If the input is a statement input, determine if a notch
     // should be drawn at the inner bottom of the C.
@@ -742,11 +745,14 @@ Blockly.BlockSvg.prototype.renderCompute_ = function(iconWidth) {
   // Data is attached to the row.
   this.computeOutputPadding_(inputRows);
   inputRows.rightEdge = this.computeRightEdge_(inputRows.hasStatement);
+
   inputRows.bottomEdge = Blockly.BlockSvg.computeBottomEdge_(inputRows);
   // This is the width of a block where statements are nested.
   inputRows.statementEdge = Blockly.BlockSvg.STATEMENT_INPUT_EDGE_WIDTH +
       fieldStatementWidth;
 
+  // YOLO THO
+  inputRows.maxRowWidth = maxRowWidth;
   return inputRows;
 };
 
@@ -771,6 +777,9 @@ Blockly.BlockSvg.computeInputWidth_ = function(input) {
       default:
         return 0;
     }
+  } else if (input.type == Blockly.INPUT_STATEMENT &&
+    (input.connection && input.connection.isConnected())) {
+    return input.connection.targetBlock().getHeightWidth().width;
   } else {
     return 0;
   }
@@ -1059,7 +1068,8 @@ Blockly.BlockSvg.prototype.renderDrawTop_ =
   if (this.squareTopLeftCorner_) {
     steps.push('m 0,0');
     if (this.startHat_) {
-      steps.push(Blockly.BlockSvg.START_HAT_PATH);
+      this.drawTheFanciestHat_(steps, rightEdge);
+      //steps.push(Blockly.BlockSvg.START_HAT_PATH);
     }
     // Skip space for the output shape
     if (this.edgeShapeWidth_) {
@@ -1170,6 +1180,8 @@ Blockly.BlockSvg.prototype.renderDrawRight_ = function(steps,
     } else if (row.type == Blockly.NEXT_STATEMENT) {
       // Nested statement.
       var input = row[0];
+      var hasShadow = input.connection.isConnected() &&
+          input.connection.targetBlock().isShadow();
       var fieldX = cursorX;
       var fieldY = cursorY;
         // Align fields vertically within the row.
@@ -1179,16 +1191,26 @@ Blockly.BlockSvg.prototype.renderDrawRight_ = function(steps,
         fieldY += Blockly.BlockSvg.MIN_STATEMENT_INPUT_HEIGHT / 2;
       this.renderFields_(input.fieldRow, fieldX, fieldY);
 
+      var oldCursorX = cursorX;
       // Move to the start of the notch.
       cursorX = inputRows.statementEdge + Blockly.BlockSvg.NOTCH_WIDTH;
-      Blockly.BlockSvg.drawStatementInputFromTopRight_(steps, cursorX,
-          inputRows.rightEdge, row);
+      // Shadow statements (on define blocks).
+      if (hasShadow) {
+        this.drawRightSideAroundStatement_(steps, input, row, cursorX, oldCursorX);
+      } else {
+        Blockly.BlockSvg.drawStatementInputFromTopRight_(steps, cursorX,
+            inputRows.rightEdge, row);
+      }
 
       this.updateStatementConnectionPos_(cursorX, cursorY, connectionsXY, input,
           inputRows.statementEdge);
 
-      if (y == inputRows.length - 1 ||
-          inputRows[y + 1].type == Blockly.NEXT_STATEMENT) {
+      if (hasShadow) {
+        steps.push('v', Blockly.BlockSvg.EXTRA_STATEMENT_ROW_Y / 2 -
+            2 * Blockly.BlockSvg.CORNER_RADIUS);
+        cursorY += Blockly.BlockSvg.EXTRA_STATEMENT_ROW_Y / 2;
+      } else if ((y == inputRows.length - 1 ||
+          inputRows[y + 1].type == Blockly.NEXT_STATEMENT)) {
         // If the final input is a statement stack, add a small row underneath.
         // Consecutive statement stacks are also separated by a small divider.
         steps.push(Blockly.BlockSvg.TOP_RIGHT_CORNER);
@@ -1389,7 +1411,7 @@ Blockly.BlockSvg.hasNotchAtBottom_ = function(input) {
 
 /**
  * Update the rendered height and width of this input to include padding based
- * on the input typed and connected state.
+ * on the input type and connected state.
  * @param {!Blockly.Input} input The input to update.
  * @param {!Object} row The current row on the block that is being measured.
  * @private
@@ -1526,4 +1548,31 @@ Blockly.BlockSvg.prototype.updateValueConnectionPos_ = function(cursorX,
   if (input.connection.isConnected()) {
     input.connection.tighten_();
   }
+};
+
+Blockly.BlockSvg.prototype.drawRightSideAroundStatement_ = function(steps,
+    input, row, cursorX, oldCursorX) {
+
+  // Remove final separator and replace it with right-padding.
+  // Move to the right edge
+  oldCursorX = Math.max(oldCursorX, input.renderWidth + cursorX);
+  this.width = Math.max(this.width, oldCursorX);
+  // Include corner radius in drawing the horizontal line.
+  steps.push('H', oldCursorX - Blockly.BlockSvg.CORNER_RADIUS);
+  steps.push(Blockly.BlockSvg.TOP_RIGHT_CORNER);
+  // Subtract CORNER_RADIUS * 2 to account for the top right corner
+  // and also the bottom right corner. Only move vertically the non-corner length.
+  //steps.push('v', row.height - Blockly.BlockSvg.CORNER_RADIUS * 2);
+
+  var statementSize = input.connection.targetBlock().getHeightWidth();
+  steps.push('v', statementSize.height - Blockly.BlockSvg.CORNER_RADIUS * 2);
+};
+
+
+Blockly.BlockSvg.prototype.drawTheFanciestHat_ = function(steps, rightEdge) {
+  steps.push('v', - 4 * Blockly.BlockSvg.GRID_UNIT);
+  //steps.push(Blockly.BlockSvg.TOP_LEFT_CORNER);
+  steps.push('h', rightEdge);
+  //steps.push(Blockly.BlockSvg.TOP_RIGHT_CORNER);
+  steps.push('v', 4 * Blockly.BlockSvg.GRID_UNIT);
 };

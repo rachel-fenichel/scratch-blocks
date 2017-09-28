@@ -391,3 +391,25 @@ Blockly.Blocks['define_block'] = {
     });
   }
 };
+
+Blockly.defineBlocksWithJsonArray([  // BEGIN JSON EXTRACT
+  {
+    "type": "controls_repeat",
+    "message0": "repeat %1 times",
+    "args0": [{
+      "type": "field_number",
+      "name": "TIMES",
+      "value": 10,
+      "min": 0,
+      "precision": 1
+    }],
+    "message1": "do stuff %1",
+    "args1": [{
+      "type": "input_statement",
+      "name": "DO"
+    }],
+    "previousStatement": null,
+    "nextStatement": null,
+    "extensions": ["colours_control"]
+  }
+]);  // END JSON EXTRACT (Do not delete this comment.)

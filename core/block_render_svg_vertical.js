@@ -206,6 +206,22 @@ Blockly.BlockSvg.TOP_RIGHT_CORNER =
     Blockly.BlockSvg.CORNER_RADIUS;
 
 /**
+ * SVG start point for drawing the top-left corner.
+ * @const
+ */
+Blockly.BlockSvg.TOP_LEFT_CORNER_START_FANCY_HAT =
+    'm 0,' + Blockly.BlockSvg.CORNER_RADIUS;
+
+/**
+ * SVG path for drawing the rounded top-left corner.
+ * @const
+ */
+Blockly.BlockSvg.TOP_LEFT_CORNER_FANCY_HAT =
+    'a ' + Blockly.BlockSvg.CORNER_RADIUS + ',' +
+    Blockly.BlockSvg.CORNER_RADIUS + ' 0 0,1 ' +
+    Blockly.BlockSvg.CORNER_RADIUS + ',-' +
+    Blockly.BlockSvg.CORNER_RADIUS;
+/**
  * SVG path for drawing the rounded bottom-right corner.
  * @const
  */
@@ -639,18 +655,18 @@ Blockly.BlockSvg.prototype.renderFields_ =
     var translateX, translateY;
     var scale = '';
     if (this.RTL) {
-      cursorX -= field.renderSep + field.renderWidth;
+      cursorX -= field.renderSepBefore + field.renderWidth;
       translateX = cursorX;
       translateY = cursorY + yOffset;
       if (field.renderWidth) {
-        cursorX -= Blockly.BlockSvg.SEP_SPACE_X;
+        cursorX -= field.renderSepAfter;
       }
     } else {
-      translateX = cursorX + field.renderSep;
+      translateX = cursorX + field.renderSepBefore;
       translateY = cursorY + yOffset;
       if (field.renderWidth) {
-        cursorX += field.renderSep + field.renderWidth +
-            Blockly.BlockSvg.SEP_SPACE_X;
+        cursorX += field.renderSepBefore + field.renderWidth +
+            field.renderSepAfter;
       }
     }
     if (this.RTL &&
@@ -698,33 +714,39 @@ Blockly.BlockSvg.prototype.renderCompute_ = function(iconWidth) {
     if (!lastType ||
         lastType == Blockly.NEXT_STATEMENT ||
         input.type == Blockly.NEXT_STATEMENT) {
+      // Create a new row.
       lastType = input.type;
-      row = this.createRowForInput_(input);
+      row = this.createRowWithInput_(input);
       inputRows.push(row);
     } else {
+      // Add information to the current row (inline value inputs).
       row = inputRows[inputRows.length - 1];
+      row.push(input);
     }
-    row.push(input);
-
-    // Compute minimum dimensions for this input.  These may later be revised.
-    input.renderHeight = this.computeInputHeight_(input, row, previousRow);
-    input.renderWidth = Blockly.BlockSvg.computeInputWidth_(input);
-    maxRowWidth = Math.max(maxRowWidth, input.renderWidth);
 
     // If the input is a statement input, determine if a notch
     // should be drawn at the inner bottom of the C.
     row.statementNotchAtBottom = Blockly.BlockSvg.hasNotchAtBottom_(input);
 
-    Blockly.BlockSvg.addPaddingToInput_(input, row);
-
+    this.computeInputDimensions_(input, row, previousRow);
+    // Spacing after the input.
+    input.renderWidth += Blockly.BlockSvg.SEP_SPACE_X;
+    var isLastInputOnRow = !this.inputList[i + 1];
+    if (isLastInputOnRow && input.type == Blockly.INPUT_VALUE) {
+      input.renderWidth -= Blockly.BlockSvg.SEP_SPACE_X;
+    }
+    // Update the row height if this is an especially tall input.
     row.height = Math.max(row.height, input.renderHeight);
-    input.fieldWidth = 0;
+    row.width += input.renderWidth;
+
+    Blockly.BlockSvg.measureFieldsOnInput_(input, row, iconWidth);
+
     if (inputRows.length == 1) {
-      // The first row gets shifted to accommodate any icons.
-      input.fieldWidth += this.RTL ? -iconWidth : iconWidth;
+      // Only the first row gets shifted to accommodate any icons.
+      iconWidth = 0;
     }
 
-    Blockly.BlockSvg.measureField_(input, row);
+    maxRowWidth = Math.max(maxRowWidth, row.width);
 
     if (row.type != Blockly.BlockSvg.INLINE) {
       if (row.type == Blockly.NEXT_STATEMENT) {
@@ -753,17 +775,18 @@ Blockly.BlockSvg.prototype.renderCompute_ = function(iconWidth) {
 
   // YOLO THO
   inputRows.maxRowWidth = maxRowWidth;
+  console.log(inputRows.maxRowWidth);
   return inputRows;
 };
 
 /**
- * Compute the minimum width of this input based on the connection type and
- * outputs.
+ * Compute the minimum width of this input, not including fields, based on the
+ * connection type and outputs.
  * @param {!Blockly.Input} input The input to measure.
  * @return {number} the computed width of this input.
  * @private
  */
-Blockly.BlockSvg.computeInputWidth_ = function(input) {
+Blockly.BlockSvg.computeMinimumInputWidth_ = function(input) {
   // Empty input shape widths.
   if (input.type == Blockly.INPUT_VALUE &&
       (!input.connection || !input.connection.isConnected())) {
@@ -777,9 +800,7 @@ Blockly.BlockSvg.computeInputWidth_ = function(input) {
       default:
         return 0;
     }
-  } else if (input.type == Blockly.INPUT_STATEMENT &&
-    (input.connection && input.connection.isConnected())) {
-    return input.connection.targetBlock().getHeightWidth().width;
+  // Minimum width of a statement input is apparently zero. Weird.
   } else {
     return 0;
   }
@@ -794,7 +815,7 @@ Blockly.BlockSvg.computeInputWidth_ = function(input) {
  * @return {number} the computed height of this input.
  * @private
  */
-Blockly.BlockSvg.prototype.computeInputHeight_ = function(input, row,
+Blockly.BlockSvg.prototype.computeMinimumInputHeight_ = function(input, row,
     previousRow) {
   if (this.inputList.length === 1 && this.isShadow() && this.outputConnection) {
     // "Lone" field blocks are smaller.
@@ -819,22 +840,26 @@ Blockly.BlockSvg.prototype.computeInputHeight_ = function(input, row,
  * @param {!Blockly.Input} input The input that the row is based on.
  * @return {!Object} The new row, with the correct type and default sizing info.
  */
-Blockly.BlockSvg.prototype.createRowForInput_ = function(input) {
-  // Create new row.
-  var row = [];
+Blockly.BlockSvg.prototype.createRowWithInput_ = function(input) {
+  // Create new row containing just this input.
+  var row = [input];
   if (input.type != Blockly.NEXT_STATEMENT) {
     row.type = Blockly.BlockSvg.INLINE;
   } else {
     row.type = input.type;
   }
-  row.height = 0;
   // Default padding for a block: same as separators between fields/inputs.
   row.paddingStart = Blockly.BlockSvg.SEP_SPACE_X;
   row.paddingEnd = Blockly.BlockSvg.SEP_SPACE_X;
+
+  // Include padding in the width of the row.
+  row.width = 2 * Blockly.BlockSvg.SEP_SPACE_X;
+  row.height = 0;
   return row;
 };
 
 /**
+ * This is really a computation of the minimum width, not that actual width.
  * Compute the preferred right edge of the block.
  * The block will be drawn from 0 (left edge) to rightEdge, in px.
  * @param {boolean} hasStatement Whether this block has a statement input.
@@ -988,7 +1013,7 @@ Blockly.BlockSvg.prototype.renderDraw_ = function(iconWidth, inputRows) {
   var steps = [];
 
   this.renderDrawTop_(steps, connectionsXY,
-      inputRows.rightEdge);
+      inputRows.maxRowWidth);
   var cursorY = this.renderDrawRight_(steps,
       connectionsXY, inputRows, iconWidth);
   this.renderDrawBottom_(steps, connectionsXY, cursorY);
@@ -1119,31 +1144,23 @@ Blockly.BlockSvg.prototype.renderDrawRight_ = function(steps,
 
     if (row.type == Blockly.BlockSvg.INLINE) {
       // Inline inputs.
+      var lastInput;
       for (var x = 0, input; input = row[x]; x++) {
-        var fieldX = cursorX;
-        var fieldY = cursorY;
         // Align fields vertically within the row.
         // Moves the field to half of the row's height.
         // In renderFields_, the field is further centered
         // by its own rendered height.
-        fieldY += row.height / 2;
-
-        // Align inline field rows (left/right/centre).
-        if (input.align === Blockly.ALIGN_RIGHT) {
-          fieldX += inputRows.rightEdge - input.fieldWidth -
-            (2 * Blockly.BlockSvg.SEP_SPACE_X);
-        } else if (input.align === Blockly.ALIGN_CENTRE) {
-          fieldX = Math.max(
-            inputRows.rightEdge / 2 - input.fieldWidth / 2,
-            fieldX
-          );
-        }
+        var fieldY = cursorY + row.height / 2;
+        var fieldX = Blockly.BlockSvg.alignFieldX_(inputRows.rightEdge, input, cursorX);
 
         cursorX = this.renderFields_(input.fieldRow, fieldX, fieldY);
         if (input.type == Blockly.INPUT_VALUE) {
           // Create inline input connection.
           // In blocks with a notch, inputs should be bumped to a min X,
           // to avoid overlapping with the notch.
+          // This is already done in renderFields.
+          // No, it's not, but renderFields claims it does it.  What?
+          // The one in renderFields does it for fields.  This does it for inputs.
           if (this.previousConnection) {
             cursorX = Math.max(cursorX, Blockly.BlockSvg.INPUT_AND_FIELD_MIN_X);
           }
@@ -1152,11 +1169,16 @@ Blockly.BlockSvg.prototype.renderDrawRight_ = function(steps,
           this.updateValueConnectionPos_(cursorX, cursorY, connectionsXY, input,
               connectionYOffset);
           this.renderInputShape_(input, cursorX, cursorY + connectionYOffset);
-          cursorX += input.renderWidth + Blockly.BlockSvg.SEP_SPACE_X;
+          cursorX += input.renderWidth;// + Blockly.BlockSvg.SEP_SPACE_X;
         }
+        lastInput = input;
       }
-      // Remove final separator and replace it with right-padding.
-      cursorX -= Blockly.BlockSvg.SEP_SPACE_X;
+      // Remove final separator if it was a value input.
+      // if (lastInput && lastInput.type == Blockly.INPUT_VALUE) {
+      //   cursorX -= Blockly.BlockSvg.SEP_SPACE_X;
+      // }
+      // Add correct right-padding.
+      //cursorX -= Blockly.BlockSvg.SEP_SPACE_X;
       cursorX += row.paddingEnd;
       // Update right edge for all inputs, such that all following rows
       // stretch to be at least the size of all previous rows.
@@ -1410,66 +1432,6 @@ Blockly.BlockSvg.hasNotchAtBottom_ = function(input) {
 };
 
 /**
- * Update the rendered height and width of this input to include padding based
- * on the input type and connected state.
- * @param {!Blockly.Input} input The input to update.
- * @param {!Object} row The current row on the block that is being measured.
- * @private
- */
-Blockly.BlockSvg.addPaddingToInput_ = function(input, row) {
-  if (!input.connection) {
-    return;
-  }
-  var linkedBlock = input.connection.targetBlock();
-  var paddedHeight = 0;
-  var paddedWidth = 0;
-  if (linkedBlock) {
-    // A block is connected to the input - use its size.
-    var bBox = linkedBlock.getHeightWidth();
-    paddedHeight = bBox.height;
-    paddedWidth = bBox.width;
-  } else {
-    // No block connected - use the size of the rendered empty input shape.
-    paddedHeight = Blockly.BlockSvg.INPUT_SHAPE_HEIGHT;
-  }
-  if (input.connection.type === Blockly.INPUT_VALUE) {
-    paddedHeight += 2 * Blockly.BlockSvg.INLINE_PADDING_Y;
-  }
-  if (input.connection.type === Blockly.NEXT_STATEMENT) {
-    // Subtract height of notch, only if the last block in the stack has a next connection.
-    if (row.statementNotchAtBottom) {
-      paddedHeight -= Blockly.BlockSvg.NOTCH_HEIGHT;
-    }
-  }
-  input.renderHeight = Math.max(input.renderHeight, paddedHeight);
-  input.renderWidth = Math.max(input.renderWidth, paddedWidth);
-};
-
-/**
- * Update the row height and input width based on the dimensions of all of the
- * fields on this input.
- * @param {!Blockly.Input} input The input whose fields should be measured.
- * @param {!Object} row The current row on the block that is being measured.
- * @private
- */
-Blockly.BlockSvg.measureField_ = function(input, row) {
-  var previousFieldEditable = false;
-  for (var j = 0, field; field = input.fieldRow[j]; j++) {
-    if (j != 0) {
-      input.fieldWidth += Blockly.BlockSvg.SEP_SPACE_X;
-    }
-    // Get the dimensions of the field.
-    var fieldSize = field.getSize();
-    field.renderWidth = fieldSize.width;
-    field.renderSep = (previousFieldEditable && field.EDITABLE) ?
-        Blockly.BlockSvg.SEP_SPACE_X : 0;
-    input.fieldWidth += field.renderWidth + field.renderSep;
-    row.height = Math.max(row.height, fieldSize.height);
-    previousFieldEditable = field.EDITABLE;
-  }
-};
-
-/**
  * Compute the preferred bottom edge of the block, which is simply the sum of
  * the row heights.
  * The block will be drawn from 0 to bottomEdge vertically.
@@ -1555,24 +1517,179 @@ Blockly.BlockSvg.prototype.drawRightSideAroundStatement_ = function(steps,
 
   // Remove final separator and replace it with right-padding.
   // Move to the right edge
-  oldCursorX = Math.max(oldCursorX, input.renderWidth + cursorX);
-  this.width = Math.max(this.width, oldCursorX);
+  //oldCursorX = Math.max(oldCursorX, input.renderWidth + cursorX);
+  //this.width = Math.max(this.width, oldCursorX);
   // Include corner radius in drawing the horizontal line.
-  steps.push('H', oldCursorX - Blockly.BlockSvg.CORNER_RADIUS);
-  steps.push(Blockly.BlockSvg.TOP_RIGHT_CORNER);
+  //steps.push('H', oldCursorX - Blockly.BlockSvg.CORNER_RADIUS);
+  //steps.push(Blockly.BlockSvg.TOP_RIGHT_CORNER);
   // Subtract CORNER_RADIUS * 2 to account for the top right corner
   // and also the bottom right corner. Only move vertically the non-corner length.
   //steps.push('v', row.height - Blockly.BlockSvg.CORNER_RADIUS * 2);
 
-  var statementSize = input.connection.targetBlock().getHeightWidth();
-  steps.push('v', statementSize.height - Blockly.BlockSvg.CORNER_RADIUS * 2);
+  //var statementSize = input.connection.targetBlock().getHeightWidth();
+  steps.push('v', input.renderHeight);
 };
 
 
 Blockly.BlockSvg.prototype.drawTheFanciestHat_ = function(steps, rightEdge) {
   steps.push('v', - 4 * Blockly.BlockSvg.GRID_UNIT);
-  //steps.push(Blockly.BlockSvg.TOP_LEFT_CORNER);
-  steps.push('h', rightEdge);
-  //steps.push(Blockly.BlockSvg.TOP_RIGHT_CORNER);
+  //steps.push(Blockly.BlockSvg.TOP_LEFT_CORNER_START_FANCY_HAT);
+  steps.push(Blockly.BlockSvg.TOP_LEFT_CORNER_FANCY_HAT);
+  steps.push('h', rightEdge - 2 * Blockly.BlockSvg.CORNER_RADIUS);
+  steps.push(Blockly.BlockSvg.TOP_RIGHT_CORNER);
   steps.push('v', 4 * Blockly.BlockSvg.GRID_UNIT);
+};
+
+/**
+ * Compute the dimensions of the given input and saves them on the input,
+ * taking into account
+ * - minimum sizes
+ * - linked blocks
+ * - relationships to the current and previous rows.
+ * @param {!Blockly.Input} input The input to measure.
+ * @param {!Object} row The row that is currently being measured.
+ * @param {Object} previousRow The previous row on the block.
+ * @private
+ */
+Blockly.BlockSvg.prototype.computeInputDimensions_ = function(input, row,
+    previousRow) {
+  var minHeight = this.computeMinimumInputHeight_(input, row, previousRow);
+  var minWidth = Blockly.BlockSvg.computeMinimumInputWidth_(input);
+
+  if (!input.connection) {
+    input.renderWidth = minWidth;
+    input.renderHeight = minHeight;
+    return;
+  }
+
+  var dimensions = Blockly.BlockSvg.getLinkedBlockSize_(input);
+
+  // Update the height.
+  if (input.connection.type === Blockly.INPUT_VALUE) {
+    dimensions.height += 2 * Blockly.BlockSvg.INLINE_PADDING_Y;
+  }
+  if (input.connection.type === Blockly.NEXT_STATEMENT) {
+    // Subtract height of notch, only if the last block in the stack has a next connection.
+    if (row.statementNotchAtBottom) {
+      dimensions.height -= Blockly.BlockSvg.NOTCH_HEIGHT;
+    }
+  }
+  input.renderHeight = Math.max(minHeight, dimensions.height);
+  input.renderWidth = Math.max(minWidth, dimensions.width);
+};
+
+/**
+ * Get the dimensions of the block connected to this input, for the purposes
+ * of rendering.  If no block is attached, set height and width to zero.
+ * @param {!Blockly.Input} input The input whose connected block should be
+ *     measured.
+ * @return {!Object} An object containing height and width.
+ * TODO: consider using a goog.math.size.
+ */
+Blockly.BlockSvg.getLinkedBlockSize_ = function(input) {
+  // Look at the size of the linked block.
+  var linkedBlock = input.connection.targetBlock();
+  var height = 0;
+  var width = 0;
+  if (linkedBlock) {
+    // A block is connected to the input - use its size.
+    var bBox = linkedBlock.getHeightWidth();
+    height = bBox.height;
+    width = bBox.width;
+  } else {
+    if (input.connection.type === Blockly.INPUT_VALUE) {
+      // No block connected - use the size of the rendered empty input shape.
+      height = Blockly.BlockSvg.INPUT_SHAPE_HEIGHT;
+    }
+    // What about no block connected on a statement input?
+  }
+  return {
+    height: height,
+    width: width
+  };
+};
+
+/**
+ * Update the row height and input width based on the dimensions of all of the
+ * fields on this input.
+ * @param {!Blockly.Input} input The input whose fields should be measured.
+ * @param {!Object} row The current row on the block that is being measured.
+ * @param {number} iconOffset How far to offset the fields to account for icons
+ *     on this row.
+ * @private
+ */
+Blockly.BlockSvg.measureFieldsOnInput_ = function(input, row, iconOffset) {
+  var width = this.RTL ? -iconOffset : iconOffset;
+  var maxHeight = row.height;
+
+
+  var previousFieldEditable = false;
+  for (var j = 0, field; field = input.fieldRow[j]; j++) {
+
+    // if (j != 0) {
+    //   // separator space after the field?
+    //   width += Blockly.BlockSvg.SEP_SPACE_X;
+    // }
+
+    Blockly.BlockSvg.computeFieldRenderSize_(field, previousFieldEditable);
+    // Add the total width of the field.
+    width += field.renderWidth + field.renderSepBefore + field.renderSepAfter;
+    maxHeight = Math.max(maxHeight, field.renderHeight);
+
+    previousFieldEditable = field.EDITABLE;
+  }
+  // The last field doesn't get a post-field separator.
+  if (field) {
+    width -= field.renderSepAfter;
+    field.renderSepAfter = 0;
+  }
+
+  // Store the results.
+  // Why does the input store the width and the row store the height?
+  input.fieldWidth = width;
+  row.width += width;
+  row.height = maxHeight;
+};
+
+/**
+ * Compute the rendered size of the given field, including separators between
+ * editable fields, and store it on the field.
+ * renderSepBefore is the separator space *before* this field.
+ * @param {!Blockly.Field} field The field to measure.
+ * @param {boolean} previousFieldEditable Whether the previous field in the input
+ *     is editable.
+ * @private
+ */
+Blockly.BlockSvg.computeFieldRenderSize_ = function(field, previousFieldEditable) {
+  // Get the dimensions of the field.
+  var fieldSize = field.getSize();
+  field.renderWidth = fieldSize.width;
+  // This seems highly suspicious.  Is this ever non-zero in scratch-blocks?
+  // Are we adding SEP_SPACE_X multiple times in this code?
+  // It's equally suspicious in Blockly.
+  field.renderSepBefore = (previousFieldEditable && field.EDITABLE) ?
+      Blockly.BlockSvg.SEP_SPACE_X : 0;
+
+  field.renderSepAfter = Blockly.BlockSvg.SEP_SPACE_X;
+  field.renderHeight = fieldSize.height;
+};
+
+/**
+ * Align the field cursor horizontally according to the alignment of the input.
+ * @param {number} blockWidth The width of the block.
+ * @param {!Blockly.Input} input The input that contains the current field.
+ * @param {number} cursorX The current x cursor, which is where the field will
+ *     be placed by default.  The field may not be placed left of the cursor.
+ * @return {number} A new cursor that aligns the field correctly.
+ * @private
+ */
+Blockly.BlockSvg.alignFieldX_ = function(blockWidth, input, cursorX) {
+  // Align inline field rows (left/right/centre).
+  if (input.align === Blockly.ALIGN_RIGHT) {
+    // minus two times the separator width because it'll be moved over by one no matter what?
+    cursorX += blockWidth - input.fieldWidth - (2 * Blockly.BlockSvg.SEP_SPACE_X);
+  } else if (input.align === Blockly.ALIGN_CENTRE) {
+    cursorX = Math.max(cursorX, blockWidth / 2 - input.fieldWidth / 2);
+  }
+  return cursorX;
 };

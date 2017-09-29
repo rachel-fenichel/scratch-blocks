@@ -195,6 +195,7 @@ Blockly.BlockSvg.TOP_LEFT_CORNER =
     Blockly.BlockSvg.CORNER_RADIUS + ' 0 0,1 ' +
     Blockly.BlockSvg.CORNER_RADIUS + ',0';
 
+
 /**
  * SVG path for drawing the rounded top-right corner.
  * @const
@@ -205,22 +206,26 @@ Blockly.BlockSvg.TOP_RIGHT_CORNER =
     Blockly.BlockSvg.CORNER_RADIUS + ',' +
     Blockly.BlockSvg.CORNER_RADIUS;
 
-/**
- * SVG start point for drawing the top-left corner.
- * @const
- */
-Blockly.BlockSvg.TOP_LEFT_CORNER_START_FANCY_HAT =
-    'm 0,' + Blockly.BlockSvg.CORNER_RADIUS;
+Blockly.BlockSvg.FANCY_HAT_CORNER_RADIUS = 4 * Blockly.BlockSvg.CORNER_RADIUS;
 
 /**
  * SVG path for drawing the rounded top-left corner.
  * @const
  */
 Blockly.BlockSvg.TOP_LEFT_CORNER_FANCY_HAT =
-    'a ' + Blockly.BlockSvg.CORNER_RADIUS + ',' +
-    Blockly.BlockSvg.CORNER_RADIUS + ' 0 0,1 ' +
-    Blockly.BlockSvg.CORNER_RADIUS + ',-' +
-    Blockly.BlockSvg.CORNER_RADIUS;
+    'a ' + Blockly.BlockSvg.FANCY_HAT_CORNER_RADIUS + ',' +
+    Blockly.BlockSvg.FANCY_HAT_CORNER_RADIUS + ' 0 0,1 ' +
+    Blockly.BlockSvg.FANCY_HAT_CORNER_RADIUS + ',-' +
+    Blockly.BlockSvg.FANCY_HAT_CORNER_RADIUS;
+/**
+ * SVG path for drawing the rounded top-left corner.
+ * @const
+ */
+Blockly.BlockSvg.TOP_RIGHT_CORNER_FANCY_HAT =
+    'a ' + Blockly.BlockSvg.FANCY_HAT_CORNER_RADIUS + ',' +
+    Blockly.BlockSvg.FANCY_HAT_CORNER_RADIUS + ' 0 0,1 ' +
+    Blockly.BlockSvg.FANCY_HAT_CORNER_RADIUS + ',' +
+    Blockly.BlockSvg.FANCY_HAT_CORNER_RADIUS;
 /**
  * SVG path for drawing the rounded bottom-right corner.
  * @const
@@ -1532,12 +1537,11 @@ Blockly.BlockSvg.prototype.drawRightSideAroundStatement_ = function(steps,
 
 
 Blockly.BlockSvg.prototype.drawTheFanciestHat_ = function(steps, rightEdge) {
-  steps.push('v', - 4 * Blockly.BlockSvg.GRID_UNIT);
-  //steps.push(Blockly.BlockSvg.TOP_LEFT_CORNER_START_FANCY_HAT);
+  steps.push('v', - 2 * Blockly.BlockSvg.GRID_UNIT);
   steps.push(Blockly.BlockSvg.TOP_LEFT_CORNER_FANCY_HAT);
-  steps.push('h', rightEdge - 2 * Blockly.BlockSvg.CORNER_RADIUS);
-  steps.push(Blockly.BlockSvg.TOP_RIGHT_CORNER);
-  steps.push('v', 4 * Blockly.BlockSvg.GRID_UNIT);
+  steps.push('h', rightEdge - 2 * Blockly.BlockSvg.FANCY_HAT_CORNER_RADIUS);
+  steps.push(Blockly.BlockSvg.TOP_RIGHT_CORNER_FANCY_HAT);
+  steps.push('v', 2 * Blockly.BlockSvg.GRID_UNIT);
 };
 
 /**
@@ -1624,6 +1628,7 @@ Blockly.BlockSvg.measureFieldsOnInput_ = function(input, row, iconOffset) {
 
 
   var previousFieldEditable = false;
+  var lastField;
   for (var j = 0, field; field = input.fieldRow[j]; j++) {
 
     // if (j != 0) {
@@ -1637,11 +1642,12 @@ Blockly.BlockSvg.measureFieldsOnInput_ = function(input, row, iconOffset) {
     maxHeight = Math.max(maxHeight, field.renderHeight);
 
     previousFieldEditable = field.EDITABLE;
+    lastField = field;
   }
   // The last field doesn't get a post-field separator.
-  if (field) {
-    width -= field.renderSepAfter;
-    field.renderSepAfter = 0;
+  if (lastField) {
+    width -= lastField.renderSepAfter;
+    lastField.renderSepAfter = 0;
   }
 
   // Store the results.

@@ -656,7 +656,7 @@ Blockly.BlockSvg.prototype.renderFields_ =
     }
     // Offset the field upward by half its height.
     // This vertically centers the fields around cursorY.
-    var yOffset = -field.getSize().height / 2;
+    var yOffset = -field.renderHeight / 2;
     var translateX, translateY;
     var scale = '';
     if (this.RTL) {
@@ -699,89 +699,90 @@ Blockly.BlockSvg.prototype.renderFields_ =
  * @private
  */
 Blockly.BlockSvg.prototype.renderCompute_ = function(iconWidth) {
-  var inputRows = [];
-  var fieldValueWidth = 0;  // Width of longest external value field.
-  var fieldStatementWidth = 0;  // Width of longest statement field.
-  inputRows.hasValue = false;
-  inputRows.hasStatement = false;
-  inputRows.hasDummy = false;
-  var lastType = undefined;
+  return this.betterRenderCompute_(iconWidth);
+  // var inputRows = [];
+  // var fieldValueWidth = 0;  // Width of longest external value field.
+  // var fieldStatementWidth = 0;  // Width of longest statement field.
+  // inputRows.hasValue = false;
+  // inputRows.hasStatement = false;
+  // inputRows.hasDummy = false;
+  // var lastType = undefined;
 
-  var maxRowWidth = 0;
+  // var maxRowWidth = 0;
 
-  // Previously created row, for special-casing row heights on C- and E- shaped blocks.
-  var previousRow;
-  for (var i = 0, input; input = this.inputList[i]; i++) {
-    if (!input.isVisible()) {
-      continue;
-    }
-    var row;
-    if (!lastType ||
-        lastType == Blockly.NEXT_STATEMENT ||
-        input.type == Blockly.NEXT_STATEMENT) {
-      // Create a new row.
-      lastType = input.type;
-      row = this.createRowWithInput_(input);
-      inputRows.push(row);
-    } else {
-      // Add information to the current row (inline value inputs).
-      row = inputRows[inputRows.length - 1];
-      row.push(input);
-    }
+  // // Previously created row, for special-casing row heights on C- and E- shaped blocks.
+  // var previousRow;
+  // for (var i = 0, input; input = this.inputList[i]; i++) {
+  //   if (!input.isVisible()) {
+  //     continue;
+  //   }
+  //   var row;
+  //   if (!lastType ||
+  //       lastType == Blockly.NEXT_STATEMENT ||
+  //       input.type == Blockly.NEXT_STATEMENT) {
+  //     // Create a new row.
+  //     lastType = input.type;
+  //     row = this.createRowWithInput_(input);
+  //     inputRows.push(row);
+  //   } else {
+  //     // Add information to the current row (inline value inputs).
+  //     row = inputRows[inputRows.length - 1];
+  //     row.push(input);
+  //   }
 
-    // If the input is a statement input, determine if a notch
-    // should be drawn at the inner bottom of the C.
-    row.statementNotchAtBottom = Blockly.BlockSvg.hasNotchAtBottom_(input);
+  //   // If the input is a statement input, determine if a notch
+  //   // should be drawn at the inner bottom of the C.
+  //   row.statementNotchAtBottom = Blockly.BlockSvg.hasNotchAtBottom_(input);
 
-    this.computeInputDimensions_(input, row, previousRow);
-    // Spacing after the input.
-    input.renderWidth += Blockly.BlockSvg.SEP_SPACE_X;
-    var isLastInputOnRow = !this.inputList[i + 1];
-    if (isLastInputOnRow && input.type == Blockly.INPUT_VALUE) {
-      input.renderWidth -= Blockly.BlockSvg.SEP_SPACE_X;
-    }
-    // Update the row height if this is an especially tall input.
-    row.height = Math.max(row.height, input.renderHeight);
-    row.width += input.renderWidth;
+  //   this.computeInputDimensions_(input, row, previousRow);
+  //   // Spacing after the input.
+  //   input.renderWidth += Blockly.BlockSvg.SEP_SPACE_X;
+  //   var isLastInputOnRow = !this.inputList[i + 1];
+  //   if (isLastInputOnRow && input.type == Blockly.INPUT_VALUE) {
+  //     input.renderWidth -= Blockly.BlockSvg.SEP_SPACE_X;
+  //   }
+  //   // Update the row height if this is an especially tall input.
+  //   row.height = Math.max(row.height, input.renderHeight);
+  //   row.width += input.renderWidth;
 
-    Blockly.BlockSvg.measureFieldsOnInput_(input, row, iconWidth);
+  //   Blockly.BlockSvg.measureFieldsOnInput_(input, row, iconWidth);
 
-    if (inputRows.length == 1) {
-      // Only the first row gets shifted to accommodate any icons.
-      iconWidth = 0;
-    }
+  //   if (inputRows.length == 1) {
+  //     // Only the first row gets shifted to accommodate any icons.
+  //     iconWidth = 0;
+  //   }
 
-    maxRowWidth = Math.max(maxRowWidth, row.width);
+  //   maxRowWidth = Math.max(maxRowWidth, row.width);
 
-    if (row.type != Blockly.BlockSvg.INLINE) {
-      if (row.type == Blockly.NEXT_STATEMENT) {
-        inputRows.hasStatement = true;
-        fieldStatementWidth = Math.max(fieldStatementWidth, input.fieldWidth);
-      } else {
-        if (row.type == Blockly.INPUT_VALUE) {
-          inputRows.hasValue = true;
-        } else if (row.type == Blockly.DUMMY_INPUT) {
-          inputRows.hasDummy = true;
-        }
-        fieldValueWidth = Math.max(fieldValueWidth, input.fieldWidth);
-      }
-    }
-    previousRow = row;
-  }
+  //   if (row.type != Blockly.BlockSvg.INLINE) {
+  //     if (row.type == Blockly.NEXT_STATEMENT) {
+  //       inputRows.hasStatement = true;
+  //       fieldStatementWidth = Math.max(fieldStatementWidth, input.fieldWidth);
+  //     } else {
+  //       if (row.type == Blockly.INPUT_VALUE) {
+  //         inputRows.hasValue = true;
+  //       } else if (row.type == Blockly.DUMMY_INPUT) {
+  //         inputRows.hasDummy = true;
+  //       }
+  //       fieldValueWidth = Math.max(fieldValueWidth, input.fieldWidth);
+  //     }
+  //   }
+  //   previousRow = row;
+  // }
 
-  // Data is attached to the row.
-  this.computeOutputPadding_(inputRows);
-  inputRows.rightEdge = this.computeRightEdge_(inputRows.hasStatement);
+  // // Data is attached to the row.
+  // this.computeOutputPadding_(inputRows);
+  // inputRows.rightEdge = this.computeRightEdge_(inputRows.hasStatement);
 
-  inputRows.bottomEdge = Blockly.BlockSvg.computeBottomEdge_(inputRows);
-  // This is the width of a block where statements are nested.
-  inputRows.statementEdge = Blockly.BlockSvg.STATEMENT_INPUT_EDGE_WIDTH +
-      fieldStatementWidth;
+  // inputRows.bottomEdge = Blockly.BlockSvg.computeBottomEdge_(inputRows);
+  // // This is the width of a block where statements are nested.
+  // inputRows.statementEdge = Blockly.BlockSvg.STATEMENT_INPUT_EDGE_WIDTH +
+  //     fieldStatementWidth;
 
-  // YOLO THO
-  inputRows.maxRowWidth = maxRowWidth;
-  console.log(inputRows.maxRowWidth);
-  return inputRows;
+  // // YOLO THO
+  // inputRows.maxRowWidth = maxRowWidth;
+  // console.log(inputRows.maxRowWidth);
+  // return inputRows;
 };
 
 /**
@@ -1174,7 +1175,7 @@ Blockly.BlockSvg.prototype.renderDrawRight_ = function(steps,
           this.updateValueConnectionPos_(cursorX, cursorY, connectionsXY, input,
               connectionYOffset);
           this.renderInputShape_(input, cursorX, cursorY + connectionYOffset);
-          cursorX += input.renderWidth;// + Blockly.BlockSvg.SEP_SPACE_X;
+          cursorX += input.renderWidth + input.renderSepAfter;// + Blockly.BlockSvg.SEP_SPACE_X;
         }
         lastInput = input;
       }
@@ -1187,7 +1188,7 @@ Blockly.BlockSvg.prototype.renderDrawRight_ = function(steps,
       cursorX += row.paddingEnd;
       // Update right edge for all inputs, such that all following rows
       // stretch to be at least the size of all previous rows.
-      inputRows.rightEdge = Math.max(cursorX, inputRows.rightEdge);
+      //inputRows.rightEdge = Math.max(cursorX, inputRows.rightEdge);
       // Move to the right edge
       cursorX = Math.max(cursorX, inputRows.rightEdge);
       this.width = Math.max(this.width, cursorX);
@@ -1557,8 +1558,12 @@ Blockly.BlockSvg.prototype.drawTheFanciestHat_ = function(steps, rightEdge) {
  */
 Blockly.BlockSvg.prototype.computeInputDimensions_ = function(input, row,
     previousRow) {
+  var fieldMeasurements = Blockly.BlockSvg.measureFieldsOnInput_(input, row, 0);
   var minHeight = this.computeMinimumInputHeight_(input, row, previousRow);
   var minWidth = Blockly.BlockSvg.computeMinimumInputWidth_(input);
+
+  minHeight = Math.max(minHeight, fieldMeasurements.height);
+  minWidth = Math.max(minWidth, fieldMeasurements.width);
 
   if (!input.connection) {
     input.renderWidth = minWidth;
@@ -1653,8 +1658,12 @@ Blockly.BlockSvg.measureFieldsOnInput_ = function(input, row, iconOffset) {
   // Store the results.
   // Why does the input store the width and the row store the height?
   input.fieldWidth = width;
-  row.width += width;
-  row.height = maxHeight;
+  return {
+    width: width,
+    height: maxHeight
+  };
+  // row.width += width;
+  // row.height = maxHeight;
 };
 
 /**
@@ -1670,6 +1679,7 @@ Blockly.BlockSvg.computeFieldRenderSize_ = function(field, previousFieldEditable
   // Get the dimensions of the field.
   var fieldSize = field.getSize();
   field.renderWidth = fieldSize.width;
+  field.renderHeight = fieldSize.height;
   // This seems highly suspicious.  Is this ever non-zero in scratch-blocks?
   // Are we adding SEP_SPACE_X multiple times in this code?
   // It's equally suspicious in Blockly.
@@ -1677,7 +1687,6 @@ Blockly.BlockSvg.computeFieldRenderSize_ = function(field, previousFieldEditable
       Blockly.BlockSvg.SEP_SPACE_X : 0;
 
   field.renderSepAfter = Blockly.BlockSvg.SEP_SPACE_X;
-  field.renderHeight = fieldSize.height;
 };
 
 /**
@@ -1698,4 +1707,137 @@ Blockly.BlockSvg.alignFieldX_ = function(blockWidth, input, cursorX) {
     cursorX = Math.max(cursorX, blockWidth / 2 - input.fieldWidth / 2);
   }
   return cursorX;
+};
+
+/**
+ * Break the input list up into a series of rows.
+ * Each row is an array of inputs.
+ * @return {!Array.<!Array.<!Blockly.Input>>} An array of rows, each of which is
+ *     an array of inputs.
+ * @private
+ */
+Blockly.BlockSvg.prototype.createRowList_ = function() {
+  var rows = [];
+  var lastType = undefined;
+  for (var i = 0, input; input = this.inputList[i]; i++) {
+    if (!input.isVisible()) {
+      continue;
+    }
+    if (i == 0 || lastType == Blockly.NEXT_STATEMENT ||
+        input.type == Blockly.NEXT_STATEMENT) {
+      lastType = input.type;
+      // Create a new row.
+      rows.push(this.createRowWithInput_(input));
+    } else {
+      // Add the input to the current row (inline value inputs).
+      var row = rows[rows.length - 1];
+      row.push(input);
+    }
+  }
+  return rows;
+};
+
+/**
+ * A replacement for renderCompute_ that uses less bullshit.
+ * @param {number} iconWidth The width of the icons on the first row.
+ * @return {!Object} I'm not sure yet.
+ * @private
+ */
+Blockly.BlockSvg.prototype.betterRenderCompute_ = function(iconWidth) {
+  var result = this.createRowList_();
+  //   rowList: this.createRowList_(),
+  //   hasValueInput: false,
+  //   hasStatementInput: false,
+  //   hasDummyInput: false,
+  //   bottomEdge: 0,
+  //   rightEdge: 0,
+  //   statementEdge: 0,
+  //   maxRowWidth: 0
+  // };
+
+  result.hasValueInput = false;
+  result.hasStatementInput = false;
+  result.hasDummyInput = false;
+  result.bottomEdge = 0;
+  result.rightEdge = 0;
+  result.statementEdge = 0;
+  result.maxRowWidth = 0;
+
+
+  var rowList = result;
+  var previousRow;
+  for (var i = 0, row; row = rowList[i]; i++) {
+    Blockly.BlockSvg.setRowHasNotchAtBottom_(row);
+    this.measureRow_(row, previousRow);
+    result.bottomEdge += row.height;
+    result.statementEdge = Math.max(result.statementEdge, row.width);
+    result.maxRowWidth = result.statementEdge;
+    result.rightEdge = result.statementEdge;
+    previousRow = row;
+  }
+
+  this.recordInputTypes_(result);
+
+
+  return result;
+};
+
+Blockly.BlockSvg.prototype.recordInputTypes_ = function(result) {
+  for (var i = 0, input; input = this.inputList[i]; i++) {
+    if (!input.isVisible()) {
+      continue;
+    }
+    if (input.type == Blockly.NEXT_STATEMENT) {
+      result.hasStatementInput = true;
+    } else if (input.type == Blockly.INPUT_VALUE) {
+      result.hasValueInput = true;
+    } else if (input.type == Blockly.DUMMY_INPUT) {
+      result.hasDummyInput = true;
+    }
+  }
+};
+
+/**
+ * Determine whether this row should have a notch at the inner bottom of the C,
+ * if the last input on this row is a statement input.  If the last input is not
+ * statement input, the row does not have a statement notch at the bottom.
+ * @param {!Array.<!Blockly.Input>} row The row to examine.
+ * @private
+ */
+Blockly.BlockSvg.setRowHasNotchAtBottom_ = function(row) {
+  row.hasStatementNotchAtBottom = false;
+  var input = row[row.length - 1];
+  if (input.connection && input.connection.type === Blockly.NEXT_STATEMENT) {
+    var linkedBlock = input.connection.targetBlock();
+    if (!linkedBlock || linkedBlock.lastConnectionInStack()) {
+      row.hasStatementNotchAtBottom = true;
+    }
+  }
+};
+
+Blockly.BlockSvg.prototype.measureRow_ = function(row, previousRow) {
+  var iconWidth = 0;
+  var previousInput;
+  for (var i = 0, input; input = row[i]; i++) {
+
+    // Compute actual input dimensions.
+    this.computeInputDimensions_(input, row, previousRow);
+
+    //Blockly.BlockSvg.measureFieldsOnInput_(input, row, iconWidth);
+    // Add some spacing.
+    // The first input has no space before it, because that's the padding.
+    // input.renderSepBefore = (i == 0 ? 0 : Blockly.BlockSvg.SEP_SPACE_X);
+
+    // The last input has no space after it, because that's the padding.
+    input.renderSepAfter = (i == row.length - 1 ? 0 : Blockly.BlockSvg.SEP_SPACE_X);
+
+    // Update the row's height.
+    row.height = Math.max(row.height, input.renderHeight);
+    row.width += input.renderWidth + input.renderSepAfter;
+    previousInput = input;
+  }
+  if (previousInput) {
+    row.width -= previousInput.renderSepAfter;
+    previousInput.renderSepAfter = 0;
+  }
 };
